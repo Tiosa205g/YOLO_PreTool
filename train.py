@@ -27,11 +27,14 @@ print("初始化完毕")
 #初始化导入数据集和预训练模型到容器内
 c2net_context = prepare()
 
+args = sys.argv
 #获取数据集路径
-brain_tumor_path = c2net_context.dataset_path+"/"+"brain-tumor"
+
+    
+brain_tumor_path = c2net_context.dataset_path+"/"+"brain-tumor" if len(args) < 3 else  c2net_context.dataset_path+"/"+args[2]
 
 #获取预训练模型路径
-yolo26m_path = c2net_context.pretrain_model_path+"/"+"yolo26m"
+model_path = c2net_context.pretrain_model_path+"/"+"yolo26m/yolo26m.pt" if len(args) < 2 else  c2net_context.dataset_path+"/"+args[1]+'/best.pt'
 
 
 
@@ -40,10 +43,11 @@ RESUME = False
 if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'device: {device}')
-    print(brain_tumor_path,yolo26m_path)
-    print(os.listdir(brain_tumor_path),os.listdir(yolo26m_path))
+    
+    print(brain_tumor_path,model_path)
+    print(os.listdir(brain_tumor_path),os.listdir(model_path))
     # Load a model
-    model = YOLO(yolo26m_path+"/yolo26m.pt")  # load a pretrained model (recommended for training)
+    model = YOLO(model_path)  # load a pretrained model (recommended for training)
     #model = YOLO('best.pt')
     results = model.train(data="data.yaml",
                           epochs=100,
