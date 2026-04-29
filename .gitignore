@@ -1,0 +1,7 @@
+datasets/
+runs/
+.venv/
+.idea/
+__pycache__/
+*.whl
+yolo26m.pt
