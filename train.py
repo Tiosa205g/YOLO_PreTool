@@ -1,4 +1,4 @@
-
+import argparse
 import torch
 import os
 from c2net.context import prepare,upload_output
@@ -22,19 +22,21 @@ def install_package(package_name):
 # ====================== 自动检查并安装 ultralytics ======================
 install_package("ultralytics")
 from ultralytics import YOLO
-print("初始化完毕")
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--model',type=str,default='yolo26m/yolo26m.pt')
+parser.add_argument('--data',type=str,default='brain-tumor')
+args = parser.parse_args()
+print(args)
 #初始化导入数据集和预训练模型到容器内
 c2net_context = prepare()
 
-args = sys.argv
+
+
 #获取数据集路径
-
-    
-brain_tumor_path = c2net_context.dataset_path+"/"+"brain-tumor" if len(args) < 3 else  c2net_context.dataset_path+"/"+args[2]
-
+brain_tumor_path = c2net_context.dataset_path+"/"+args.data
 #获取预训练模型路径
-model_path = c2net_context.pretrain_model_path+"/"+"yolo26m/yolo26m.pt" if len(args) < 2 else  c2net_context.dataset_path+"/"+args[1]+'/best.pt'
+model_path = c2net_context.pretrain_model_path+"/"+args.model
 
 
 
@@ -45,20 +47,18 @@ if __name__ == '__main__':
     print(f'device: {device}')
     
     print(brain_tumor_path,model_path)
-    print(os.listdir(brain_tumor_path),os.listdir(model_path))
     # Load a model
-    model = YOLO(model_path)  # load a pretrained model (recommended for training)
-    #model = YOLO('best.pt')
+    model = YOLO(model_path)  
     results = model.train(data="data.yaml",
                           epochs=100,
                           imgsz=640,
                           device=device,
                           resume = RESUME,
-                          flipud = 0.4
+                          flipud = 0.4 #上下颠倒概率
                           )
     import shutil
     try:
-        shutil.copy("runs/detect/train/weights/best.pt",c2net_context.output_path+"/best.pt")
+        shutil.copy("runs/detect/train/weights/best.pt",c2net_context.output_path)
         #回传结果到openi，只有训练任务才能回传
         upload_output()
         print("复制成功")
