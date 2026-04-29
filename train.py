@@ -49,7 +49,8 @@ if __name__ == '__main__':
                           epochs=100,
                           imgsz=640,
                           device=device,
-                          resume = RESUME
+                          resume = RESUME,
+                          flipud = 0.4
                           )
     import shutil
     try:
