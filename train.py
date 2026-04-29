@@ -34,11 +34,6 @@ brain_tumor_path = c2net_context.dataset_path+"/"+"brain-tumor"
 yolo26m_path = c2net_context.pretrain_model_path+"/"+"yolo26m"
 
 
-#输出结果必须保存在该目录
-you_should_save_here = c2net_context.output_path
-
-#回传结果到openi，只有训练任务才能回传
-upload_output()
 
 RESUME = False
 
@@ -56,3 +51,12 @@ if __name__ == '__main__':
                           device=device,
                           resume = RESUME
                           )
+    import shutil
+    try:
+        shutil.copy("runs/detect/train/weights/best.pt",c2net_context.output_path+"/best.pt")
+        #回传结果到openi，只有训练任务才能回传
+        upload_output()
+        print("复制成功")
+    except Exception as e:
+        print(f"复制文件出错:{e}")
+        
