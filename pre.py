@@ -9,6 +9,8 @@ if __name__ == '__main__':
     model = YOLO('best.pt')
     res = model.predict(detect_files,
                         device = device,
-                        retina_masks = True)
+                        retina_masks = True,
+                        iou = 0.7,
+                        agnostic_nms=True)
     for r in res:
         r.show()

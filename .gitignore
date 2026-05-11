@@ -6,3 +6,5 @@ __pycache__/
 *.whl
 *.pt
 *.jpg
+qfluentwidgets_pro/
+app/
