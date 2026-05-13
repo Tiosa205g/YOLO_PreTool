@@ -1,4 +1,5 @@
 import torch
+from .util import *
 from matplotlib import pyplot as plt
 from PIL import Image
 from PySide6.QtWidgets import (
@@ -7,6 +8,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QTableWidgetItem,
+
 )
 from PySide6.QtCore import Qt
 from qfluentwidgets_pro import (
@@ -26,6 +28,7 @@ from qfluentwidgets_pro import (
     ProgressBar,
     ToolTipSlider,
     RangeSlider,
+    
 )
 from qfluentwidgets_pro.components.widgets.acrylic_label import AcrylicLabel
 
@@ -53,25 +56,6 @@ yolo_defaults = {
     "compile": False,
     "end2end": None,
 }
-
-
-def get_available_devices():
-    """返回所有可用设备列表 [cpu, cuda:0, cuda:1, ...]"""
-    devices = ["cpu"]
-    if torch.cuda.is_available():
-        for i in range(torch.cuda.device_count()):
-            devices.append(f"cuda:{i}")
-    return devices
-
-
-def show_image_in_plt(q_image):
-    pil_img = Image.fromqimage(q_image)
-
-    plt.figure()
-    plt.imshow(pil_img)
-    plt.axis("off")
-    plt.show()
-
 
 class Window(TopFluentWindow):
     def __init__(self):
@@ -111,43 +95,46 @@ class Window(TopFluentWindow):
 
     def _createImportWidget(self) -> QWidget:
         w = QWidget(self)
-        w.mainLayout = QHBoxLayout(w)
+        mainLayout = QHBoxLayout(w)
 
         vLayout = QVBoxLayout()
-        w.modelLabel = BodyLabel("模型文件:")
-        w.modelSelect = DropSingleFileWidget()
-        w.modelSelect.setFixedHeight(125)
-        w.dataLabel = BodyLabel("数据集文件:")
-        w.dataSelect = DropSingleFolderWidget()
-        w.dataSelect.setFixedHeight(125)
+        modelLabel = BodyLabel("模型文件:")
+        modelSelect = DropSingleFileWidget()
+        modelSelect.setFixedHeight(125)
+        dataLabel = BodyLabel("数据集文件:")
+        dataSelect = DropSingleFolderWidget()
+        dataSelect.setFixedHeight(125)
         vLayout.addStretch()
-        vLayout.addWidget(w.modelLabel)
-        vLayout.addWidget(w.modelSelect)
+        vLayout.addWidget(modelLabel)
+        vLayout.addWidget(modelSelect)
         vLayout.addSpacing(20)
-        vLayout.addWidget(w.dataLabel)
-        vLayout.addWidget(w.dataSelect)
+        vLayout.addWidget(dataLabel)
+        vLayout.addWidget(dataSelect)
         vLayout.addStretch()
 
         vLayout2 = QVBoxLayout()
         vLayout2.addSpacing(20)
-        w.argTable = LineTableWidget(w)
-        w.argTable.setFixedWidth(500)
-        w.argTable.setColumnCount(2)
-        w.argTable.setRowCount(22)
-        w.argTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        w.argTable.setHorizontalHeaderLabels(["参数名", "值"])
+        argTable = LineTableWidget()
+        argTable.editItem
+        argTable.setFixedWidth(500)
+        argTable.setColumnCount(2)
+        argTable.setRowCount(22)
+        argTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        argTable.setHorizontalHeaderLabels(["参数名", "值"])
+        set_table_scorllbar_style(argTable)
+        argTable.delegate.setUseTransparentRows(True)
         for i, (key, val) in enumerate(yolo_defaults.items()):
-            w.argTable.setItem(i, 0, QTableWidgetItem(key))
-            w.argTable.setItem(i, 1, QTableWidgetItem(str(val)))
-        vLayout2.addWidget(w.argTable)
+            argTable.setItem(i, 0, QTableWidgetItem(key))
+            argTable.setItem(i, 1, QTableWidgetItem(str(val)))
+        vLayout2.addWidget(argTable)
         vLayout2.addSpacing(20)
 
-        w.mainLayout.addSpacing(20)
-        w.mainLayout.addLayout(vLayout)
-        w.mainLayout.addSpacing(30)
+        mainLayout.addSpacing(20)
+        mainLayout.addLayout(vLayout)
+        mainLayout.addSpacing(30)
 
-        w.mainLayout.addLayout(vLayout2)
-        w.mainLayout.addSpacing(20)
+        mainLayout.addLayout(vLayout2)
+        mainLayout.addSpacing(20)
 
         return w
 
@@ -225,19 +212,19 @@ class Window(TopFluentWindow):
         tableLayout = QHBoxLayout()
         labelTable = LineTableWidget(card2)
         labelTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        labelTable.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         labelTable.setEditTriggers(labelTable.EditTrigger.NoEditTriggers)
-        labelTable.setColumnCount(1)
+        labelTable.setColumnCount(2)
         labelTable.setRowCount(20)
-        labelTable.setHorizontalHeaderLabels(["标签名"])
+        labelTable.setHorizontalHeaderLabels(["标签名","数量"])
+        set_table_scorllbar_style(labelTable)
 
         resTable = LineTableWidget(card2)
         resTable.setColumnCount(2)
         resTable.setRowCount(20)
         resTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        resTable.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         resTable.setEditTriggers(resTable.EditTrigger.NoEditTriggers)
         resTable.setHorizontalHeaderLabels(["序号", "置信度"])
+        set_table_scorllbar_style(resTable)
         
         tableLayout.addWidget(labelTable)
         tableLayout.addWidget(resTable)
