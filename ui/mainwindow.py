@@ -1,4 +1,6 @@
 import torch
+from matplotlib import pyplot as plt
+from PIL import Image
 from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
@@ -16,6 +18,14 @@ from qfluentwidgets_pro import (
     DropSingleFileWidget,
     DropSingleFolderWidget,
     LineTableWidget,
+    ImageLabel,
+    ComboBox,
+    RoundPushButton,
+    Toast,
+    SimpleCardWidget,
+    ProgressBar,
+    ToolTipSlider,
+    RangeSlider,
 )
 from qfluentwidgets_pro.components.widgets.acrylic_label import AcrylicLabel
 
@@ -44,6 +54,7 @@ yolo_defaults = {
     "end2end": None,
 }
 
+
 def get_available_devices():
     """返回所有可用设备列表 [cpu, cuda:0, cuda:1, ...]"""
     devices = ["cpu"]
@@ -51,6 +62,16 @@ def get_available_devices():
         for i in range(torch.cuda.device_count()):
             devices.append(f"cuda:{i}")
     return devices
+
+
+def show_image_in_plt(q_image):
+    pil_img = Image.fromqimage(q_image)
+
+    plt.figure()
+    plt.imshow(pil_img)
+    plt.axis("off")
+    plt.show()
+
 
 class Window(TopFluentWindow):
     def __init__(self):
@@ -118,7 +139,6 @@ class Window(TopFluentWindow):
         for i, (key, val) in enumerate(yolo_defaults.items()):
             w.argTable.setItem(i, 0, QTableWidgetItem(key))
             w.argTable.setItem(i, 1, QTableWidgetItem(str(val)))
-
         vLayout2.addWidget(w.argTable)
         vLayout2.addSpacing(20)
 
@@ -133,5 +153,96 @@ class Window(TopFluentWindow):
 
     def _createPreWidget(self) -> QWidget:
         w = QWidget()
-        w.label = BodyLabel("PreWidget", w)
+        hLayout = QHBoxLayout(w)
+        card1 = SimpleCardWidget(w)
+        hLayout.addWidget(card1)
+
+        vLayout = QVBoxLayout(card1)
+        vLayout.addStretch()
+        imageLayout = QHBoxLayout()
+
+        imageDis = ImageLabel(card1)
+        imageDis.setImage("ui/img/test.jpg")
+        imageDis.setFixedSize(175, 175)
+        imageDis.setCursor(Qt.CursorShape.PointingHandCursor)
+        imageDis.clicked.connect(lambda: show_image_in_plt(imageDis.image))
+        imageLayout.addStretch()
+        imageLayout.addWidget(imageDis)
+        imageLayout.addStretch()
+        vLayout.addLayout(imageLayout)
+        hLayout2 = QHBoxLayout()
+
+        vLayout.addLayout(hLayout2)
+        imageChoose = ComboBox(card1)
+        imageChoose.setPlaceholderText("选择图片")
+        deviceChoose = ComboBox(card1)
+        deviceChoose.setPlaceholderText("选择设备")
+        hLayout2.addWidget(imageChoose)
+        hLayout2.addWidget(deviceChoose)
+
+        sureLabel = BodyLabel(card1)
+        sureLabel.setText("置信度:0.00")
+        sureSlider = ToolTipSlider(Qt.Horizontal, card1)
+        sureSlider.valueChanged.connect(
+            lambda x: sureLabel.setText(f"置信度:{x*0.01:.2f}")
+        )
+        sureSlider.setRange(0, 100)
+        preButton = RoundPushButton(card1)
+        preButton.setFixedHeight(50)
+        preButton.setCursor(Qt.CursorShape.PointingHandCursor)
+        preButton.setText("推理")
+        preAllButton = RoundPushButton(card1)
+        preAllButton.setFixedHeight(50)
+        preAllButton.setCursor(Qt.CursorShape.PointingHandCursor)
+        preAllButton.setText("全部推理并输出")
+        vLayout.addWidget(sureLabel)
+        vLayout.addWidget(sureSlider)
+        vLayout.addWidget(preButton)
+        vLayout.addWidget(preAllButton)
+        vLayout.addStretch()
+
+        card2 = SimpleCardWidget(w)
+        vLayout2 = QVBoxLayout(card2)
+
+        imageSureLayout = QHBoxLayout()
+        imageDis2 = ImageLabel(card2)
+        imageDis2.setImage("ui/img/res.jpg")
+        imageDis2.setFixedSize(175, 175)
+        imageDis2.setCursor(Qt.CursorShape.PointingHandCursor)
+        imageDis2.clicked.connect(lambda: show_image_in_plt(imageDis2.image))
+
+        sureRangeSlider = RangeSlider(Qt.Orientation.Vertical, card2)
+        sureRangeSlider.setRange(0, 100)
+        sureRangeSlider.minValueChanged.connect(lambda x: print(f"最小值变化:{x}"))
+        sureRangeSlider.maxValueChanged.connect(lambda x: print(f"最大值变化:{x}"))
+        imageSureLayout.addStretch()
+        imageSureLayout.addWidget(imageDis2)
+        imageSureLayout.addStretch()
+        imageSureLayout.addWidget(sureRangeSlider)
+
+        
+        vLayout2.addLayout(imageSureLayout)
+        tableLayout = QHBoxLayout()
+        labelTable = LineTableWidget(card2)
+        labelTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        labelTable.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        labelTable.setEditTriggers(labelTable.EditTrigger.NoEditTriggers)
+        labelTable.setColumnCount(1)
+        labelTable.setRowCount(20)
+        labelTable.setHorizontalHeaderLabels(["标签名"])
+
+        resTable = LineTableWidget(card2)
+        resTable.setColumnCount(2)
+        resTable.setRowCount(20)
+        resTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        resTable.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        resTable.setEditTriggers(resTable.EditTrigger.NoEditTriggers)
+        resTable.setHorizontalHeaderLabels(["序号", "置信度"])
+        
+        tableLayout.addWidget(labelTable)
+        tableLayout.addWidget(resTable)
+        
+        vLayout2.addLayout(tableLayout)
+        hLayout.addWidget(card2)
+
         return w
