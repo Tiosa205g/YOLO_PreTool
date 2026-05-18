@@ -8,7 +8,7 @@ from qfluentwidgets_pro import (
     FluentTranslator,
     QColor,
 )
-
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 app = QApplication([])
@@ -17,5 +17,5 @@ app.installTranslator(translator)
 setTheme(Theme.DARK)
 setThemeColor(QColor.fromRgb(200, 162, 200))
 w = Window()
-w.show()
+# w.show()
 sys.exit(app.exec())
