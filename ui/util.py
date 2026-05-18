@@ -7,10 +7,10 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
     QAbstractItemView,
     QStyledItemDelegate,
-    
+    QVBoxLayout,
 )
-from PySide6.QtGui import QImage,QImageReader,QMovie,QPixmap
-from PySide6.QtCore import Qt, QModelIndex
+from PySide6.QtGui import QImage, QImageReader, QMovie, QPixmap
+from PySide6.QtCore import Qt, QModelIndex, Signal
 from qfluentwidgets_pro import (
     QColor,
     LineTableWidget,
@@ -22,8 +22,7 @@ from qfluentwidgets_pro import (
     ComboBox,
     SmoothScrollDelegate,
     ImageLabel,
-    
-    
+    ProgressRing,
 )
 from qfluentwidgets_pro.components.widgets.combo_box import ComboBoxMenu
 
@@ -36,19 +35,22 @@ def get_available_devices():
             devices.append(f"cuda:{i}")
     return devices
 
-def set_scorll_bar_style(scroll:SmoothScrollDelegate):
+
+def set_scorll_bar_style(scroll: SmoothScrollDelegate):
     scroll.vScrollBar.setHandleColor("#EFECEC", "#EFECEC")
-    scroll.vScrollBar.setGrooveColor(
-        QColor(0, 0, 0, 0), QColor(0, 0, 0, 0)
-    )
+    scroll.vScrollBar.setGrooveColor(QColor(0, 0, 0, 0), QColor(0, 0, 0, 0))
     scroll.vScrollBar.setArrowColor("#EFECEC", "#EFECEC")
+
+
 def set_table_style(table: TableWidget):
     table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
     table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
     set_scorll_bar_style(table.scrollDelagate)
     table.myd = MyTableItemDelegate(table)
     table.setItemDelegate(table.myd)
-def show_image_in_plt(imglabel:ImageLabel):
+
+
+def show_image_in_plt(imglabel: ImageLabel):
     if not imglabel.pixmap() or imglabel.pixmap().isNull():
         return
     pil_img = Image.fromqimage(imglabel.image)
@@ -57,12 +59,16 @@ def show_image_in_plt(imglabel:ImageLabel):
     plt.imshow(pil_img)
     plt.axis("off")
     plt.show()
+
+
 def isnum(s: str) -> bool:
     try:
         float(s)
         return True
     except ValueError:
         return False
+
+
 def create_toast(
     title="",
     content="",
@@ -91,6 +97,8 @@ def create_toast(
 }
 """)
     return t
+
+
 def print_widget_tree(root: QWidget, indent: int = 0):
     """
     递归打印控件树（查看嵌套结构 + 类名/对象名）
@@ -111,10 +119,13 @@ def print_widget_tree(root: QWidget, indent: int = 0):
     for child in root.children():
         if isinstance(child, QWidget):  # 只遍历可视化控件
             print_widget_tree(child, indent + 1)
+
+
 def add_style_sheet(widget: QWidget, styleSheet: str):
     qss = widget.styleSheet() + "\n" + styleSheet
     widget.setStyleSheet(qss)
-    
+
+
 class MyTableItemDelegate(TableItemDelegate):
     def __init__(self, parent):
         super().__init__(parent)
@@ -215,15 +226,19 @@ PinBoxLineEdit:focus {
             table.takeItem(selection[0].row(), selection[0].column())
         # print(f"编辑内容:{content}")
 
+
 class MyComboBox(ComboBox):
     """优化菜单删除机制，手动删除更新菜单"""
+
     def __init__(self, parent=None):
         super().__init__(parent)
+
     def clear(self):
         self.dropMenu = None
         return super().clear()
+
     def _createComboMenu(self):
-        menu =  ComboBoxMenu(self)
+        menu = ComboBoxMenu(self)
         # print(menu.styleSheet())
         menu.setStyleSheet("""MenuActionListWidget {
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -256,14 +271,19 @@ MenuActionListWidget::item:selected {
 }""")
         set_scorll_bar_style(menu.view.scrollDelegate)
         return menu
+
     def _showComboMenu(self):
         super()._showComboMenu()
         # print_widget_tree(self)
+
+
 class MyImageLabel(ImageLabel):
     """去除自动更改组件大小"""
-    def __init__(self, parent = None):
+
+    def __init__(self, parent=None):
         super().__init__(parent)
-    def setImage(self, image = None):
+
+    def setImage(self, image=None):
         self.image = image or QImage()
 
         if isinstance(image, str):
@@ -277,3 +297,90 @@ class MyImageLabel(ImageLabel):
 
         # self.setFixedSize(self.image.size())
         self.update()
+
+
+class ProgressToast(Toast):
+    finished = Signal()
+
+    def __init__(
+        self,
+        title="",
+        content="",
+        orient=Qt.Horizontal,
+        toastColor=QColor(0, 0, 0, 0),
+        parent=None,
+        position=ToastPosition.TOP_RIGHT,
+        isClosable=False,
+        duration=-1,
+        backgroundColor=QColor(0, 0, 0, 0),
+        useThemeColor=False,
+    ):
+        super().__init__(
+            title,
+            content,
+            duration,
+            isClosable,
+            position,
+            orient,
+            toastColor,
+            parent,
+            backgroundColor,
+            useThemeColor,
+        )
+        self.setObjectName("toast")
+        self.setStyleSheet("""
+        #toast{
+            border: 1px solid #888888; 
+            border-radius: 8px;
+        }
+        """)
+        self.progressRing = ProgressRing(self)
+        self.progressRing.setTextVisible(True)
+        self.progressRing.setFixedSize(50,50)
+        self.addWidget(self.progressRing, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.force_text_vertical()
+        layout = self.hBoxLayout
+
+        text = self.textLayout
+        widget = self.widgetLayout
+        # 调换顺序
+        layout.removeItem(text)
+        layout.removeItem(widget)
+
+        layout.insertLayout(0, widget)
+        layout.insertLayout(1, text)
+        
+
+    def setProgress(self, val: int):
+        if val >= 100:
+            self.finished.emit()
+            self.close()
+            return
+        self.progressRing.setValue(val)
+    def force_text_vertical(self):
+        old = self.textLayout
+        items = []
+
+        while old.count():
+            item = old.takeAt(0)
+            items.append(item)
+
+        new = QVBoxLayout()
+        new.setSpacing(old.spacing())
+        new.setContentsMargins(old.contentsMargins())
+        new.setAlignment(old.alignment())
+
+        for item in items:
+            if item.widget():
+                new.addWidget(item.widget())
+            elif item.layout():
+                new.addLayout(item.layout())
+            else:
+                new.addItem(item)
+
+        parent_layout = self.hBoxLayout
+
+        parent_layout.removeItem(old)
+        parent_layout.insertLayout(0, new)
+
+        self.textLayout = new

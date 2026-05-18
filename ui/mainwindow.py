@@ -1,6 +1,6 @@
 import torch, os, math
 from ultralytics import YOLO
-from ultralytics.engine.results import Boxes
+from ultralytics.engine.results import Boxes, Results
 from pathlib import Path
 from .util import *
 from functools import partial
@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QTableWidgetItem,
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QThread
 from qfluentwidgets_pro import (
     TopFluentWindow,
     QColor,
@@ -64,8 +64,6 @@ class Window(TopFluentWindow):
         "agnostic_nms": False,
         "retina_masks": False,
         "embed": None,
-        "project": None,
-        "name": None,
         "stream": False,
         "verbose": True,
         "compile": False,
@@ -75,6 +73,7 @@ class Window(TopFluentWindow):
     cls = {}  # {class_name:[box1,box2]}
     now_name = ""
     now_boxs = []  # [box1,box2]
+    files_path = []
 
     def __init__(self):
         super().__init__()
@@ -290,13 +289,13 @@ class Window(TopFluentWindow):
         return w
 
     def modelChanged(self, path):
-        self.model_path = path
-        if len(self.model_path) == 0:
+        if len(path) == 0:
             create_toast("注意⚠️：", "请确认是否正确选择", parent=self)
             return
-        self.model_changed.emit(f"模型文件:{self.model_path[0]}")
-        create_toast("成功✅", f"载入模型文件{self.model_path[0]}", parent=self)
-        print(f"模型:{self.model_path[0]}")
+        self.model_path = path[0]
+        self.model_changed.emit(f"模型文件:{self.model_path}")
+        create_toast("成功✅", f"载入模型文件{self.model_path}", parent=self)
+        print(f"模型:{self.model_path}")
 
     def dataChanged(self, path):
         self.data_path = path
@@ -339,10 +338,11 @@ class Window(TopFluentWindow):
         ):
             self.imageChoose.clear()
             self.deviceChoose.clear()
-
+            self.files_path.clear()
             for file in Path(self.data_path[0]).glob("*"):
                 if file.is_file() and file.suffix.lower() in exts:  # 筛选图片文件
                     imgPath = str(file.resolve(False))
+                    self.files_path.append(imgPath)
                     self.imageChoose.addItem(
                         file.name, imgPath, imgPath
                     )  # 文件名 userdata:绝对路径 str
@@ -355,52 +355,95 @@ class Window(TopFluentWindow):
         self.imageDis.setImage(self.imageChoose.currentData())  # str 路径
 
     def preButtonClicked(self):
-        model = YOLO("best.pt")
-        res = model.predict(
-            self.imageChoose.currentData(),
-            device=self.deviceChoose.currentText(),
-            conf=float(self.sureSlider.value()) / 100,
-            **self.yolo_args,
-        )
-        speed = res[0].speed
-        create_toast(
-            "推理成功✅",
-            f"预处理用时:{speed['preprocess']:.1f}ms,推理用时:{speed['inference']:.1f}ms,后处理用时:{speed['postprocess']:.1f}ms",
-            parent=self,
-        )
-        img_bgr = res[0].plot()
-        img_rgb = Image.fromarray(img_bgr[..., ::-1])  # bgr->rgb
-        self.imageDis2.setImage(img_rgb.toqimage())
+        if self.model_path == "" or self.data_path == "":
+            create_toast("注意⚠️：", "请确认是否选择模型以及数据集文件夹", parent=self)
+            return
+        # model = YOLO(self.model_path)
+        # res = model.predict(
+        #     self.imageChoose.currentData(),
+        #     device=self.deviceChoose.currentText(),
+        #     conf=float(self.sureSlider.value()) / 100,
+        #     **self.yolo_args,
+        # )
 
-        self.labelTable.clearContents()
-        self.resTable.clearContents()
-        self.resTable.setRowCount(0)
-        self.sureRangeSlider.setRange(0, 100)
-        # self.labelTable.setRowCount(len(res[0].names))
-        # print(res[0].names,len(res[0].names))
-        self.cls.clear()
-        for box in res[0].boxes:
-            self.names = res[0].names
-            name = self.names[int(box.cls[0])]
-            cpy: list = self.cls.get(name, [])  # 没有返回空
-            cpy.append(box)
-            self.cls[name] = cpy
+        def finish(res):
+            speed = res[0].speed
+            create_toast(
+                "推理成功✅",
+                f"预处理用时:{speed['preprocess']:.1f}ms,推理用时:{speed['inference']:.1f}ms,后处理用时:{speed['postprocess']:.1f}ms",
+                parent=self,
+            )
+            img_bgr = res[0].plot()
+            img_rgb = Image.fromarray(img_bgr[..., ::-1])  # bgr->rgb
+            self.imageDis2.setImage(img_rgb.toqimage())
 
-        items = self.cls.items()
-        self.labelTable.setRowCount(len(items))  # 在这里添加防止出现未识别到的label
+            self.labelTable.clearContents()
+            self.resTable.clearContents()
+            self.resTable.setRowCount(0)
+            self.sureRangeSlider.setRange(0, 100)
+            # self.labelTable.setRowCount(len(res[0].names))
+            # print(res[0].names,len(res[0].names))
+            self.cls.clear()
+            for box in res[0].boxes:
+                self.names = res[0].names
+                name = self.names[int(box.cls[0])]
+                cpy: list = self.cls.get(name, [])  # 没有返回空
+                cpy.append(box)
+                self.cls[name] = cpy
 
-        for i, (name, _) in enumerate(items):
-            nameItem = QTableWidgetItem(name)
-            numItem = QTableWidgetItem(str(len(self.cls[name])))
+            items = self.cls.items()
+            self.labelTable.setRowCount(len(items))  # 在这里添加防止出现未识别到的label
 
-            self.labelTable.setItem(i, 0, nameItem)
-            self.labelTable.setItem(i, 1, numItem)
-        if len(items) > 0:
-            self.labelTable.setCurrentCell(0, 0)
-            self.currentLabelChanged(0, 0)
+            for i, (name, _) in enumerate(items):
+                nameItem = QTableWidgetItem(name)
+                numItem = QTableWidgetItem(str(len(self.cls[name])))
+
+                self.labelTable.setItem(i, 0, nameItem)
+                self.labelTable.setItem(i, 1, numItem)
+            if len(items) > 0:
+                self.labelTable.setCurrentCell(0, 0)
+                self.currentLabelChanged(0, 0)
+
+        t = ProgressToast("正在推理⏳:", "请耐心等待！", parent=self)
+
+        args: dict = self.yolo_args
+        args["device"] = self.deviceChoose.currentText()
+        args["conf"] = float(self.sureSlider.value()) / 100
+        self.pt = PreThread(self.imageChoose.currentData(), self.model_path, args, True)
+        self.pt.resultReady.connect(finish)
+        self.pt.progress.connect(t.setProgress)
+        self.pt.start()
+        t.show()
 
     def preAllButtonClicked(self):
         pass
+        # pt = ProgressToast("正在推理⏳:", "请耐心等待！", parent=self)
+        # pt.show()
+        # pt.setProgress(50)
+        # total_time = 0
+        # if self.model_path == "" or self.data_path == "":
+        #     create_toast("注意⚠️：", "请确认是否选择模型以及数据集文件夹", parent=self)
+        #     return
+        # model = YOLO(self.model_path)
+        # res = model.predict(
+        #     self.files_path,
+        #     device=self.deviceChoose.currentText(),
+        #     conf=float(self.sureSlider.value()) / 100,
+        #     name="custom",
+        #     project="outputs",
+        #     save=True,
+        #     **self.yolo_args,
+        # )
+        # for r in res:
+        #     total_time += (
+        #         r.speed["preprocess"] + r.speed["inference"] + r.speed["postprocess"]
+        #     )
+        # create_toast(
+        #     "推理成功✅",
+        #     f"已保存至outputs文件夹内\n总用时:{total_time:.1f}ms,平均用时:{total_time/len(res):.1f}",
+        #     parent=self,
+        #     duration=2500,
+        # )
 
     def currentLabelChanged(self, row, col):
         item = self.labelTable.item(row, 0)
@@ -461,3 +504,53 @@ class Window(TopFluentWindow):
 
     def currentResChanged(self, row, col):
         print(f"第{row}个box")
+
+
+class PreThread(QThread):
+    progress = Signal(int)
+    resultReady = Signal(object)
+
+    def __init__(
+        self,
+        imgs: str | Path | int | Image.Image | list | tuple,
+        model_path: str,
+        args: dict = {"conf": 0.3},
+        needRes=False,
+    ):
+        super().__init__()
+        self.imgs = imgs
+        self.args = args
+        self.model_path = model_path
+        self.needRes = needRes
+        self.model = YOLO(self.model_path)
+
+    def run(self):
+        res = []
+
+        if isinstance(self.imgs, list):
+            for i, img in enumerate(self.imgs):
+                r = self.model.predict(
+                    img,
+                    **self.args,
+                )
+                if not self.needRes:
+                    del r
+                    torch.cuda.empty_cache()
+                else:
+                    res.append(r[0])
+                self.progress.emit(int(len(self.imgs) / (i + 1)))
+        else:
+            self.progress.emit(25)
+            r = self.model.predict(
+                self.imgs,
+                **self.args,
+            )
+            self.progress.emit(80)
+            if not self.needRes:
+                del r
+                torch.cuda.empty_cache()
+            else:
+                res.append(r[0])
+            self.progress.emit(100)
+        if self.needRes:
+            self.resultReady.emit(res)
