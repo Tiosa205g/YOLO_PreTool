@@ -71,6 +71,7 @@ class Window(TopFluentWindow):
     }
     names = {}
     cls = {}  # {class_name:[box1,box2]}
+    now_res = None
     now_name = ""
     now_boxs = []  # [box1,box2]
     files_path = []
@@ -266,9 +267,10 @@ class Window(TopFluentWindow):
         self.labelTable.setEditTriggers(self.labelTable.EditTrigger.NoEditTriggers)
         self.labelTable.setColumnCount(2)
         # self.labelTable.setRowCount(20)
-        self.labelTable.setHorizontalHeaderLabels(["标签名", "数量"])
-
+        self.labelTable.setHorizontalHeaderLabels(["标签", "数量"])
+    
         self.labelTable.cellClicked.connect(self.currentLabelChanged)
+        self.labelTable.cellDoubleClicked.connect(self.labelDoubleClicked)
         set_table_style(self.labelTable)
 
         self.resTable = LineTableWidget(card2)
@@ -276,8 +278,9 @@ class Window(TopFluentWindow):
         # self.resTable.setRowCount(20)
         self.resTable.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.resTable.setEditTriggers(self.resTable.EditTrigger.NoEditTriggers)
-        self.resTable.setHorizontalHeaderLabels(["序号", "置信度"])
+        self.resTable.setHorizontalHeaderLabels(["标签", "置信度"])
         self.resTable.cellClicked.connect(self.currentResChanged)
+        self.resTable.cellDoubleClicked.connect(self.resDoubleClicked)
         set_table_style(self.resTable)
 
         tableLayout.addWidget(self.labelTable)
@@ -370,15 +373,18 @@ class Window(TopFluentWindow):
             speed = res[0].speed
             create_toast(
                 "推理成功✅",
-                f"预处理用时:{speed['preprocess']:.1f}ms,推理用时:{speed['inference']:.1f}ms,后处理用时:{speed['postprocess']:.1f}ms",
+                f"预处理用时:{speed['preprocess']:.1f}ms, 推理用时:{speed['inference']:.1f}ms, 后处理用时:{speed['postprocess']:.1f}ms",
                 parent=self,
             )
+            self.now_res = res[0]
             img_bgr = res[0].plot()
             img_rgb = Image.fromarray(img_bgr[..., ::-1])  # bgr->rgb
             self.imageDis2.setImage(img_rgb.toqimage())
 
             self.labelTable.clearContents()
+            self.labelTable.setCurrentCell(-1, -1)
             self.resTable.clearContents()
+            self.resTable.setCurrentCell(-1, -1)
             self.resTable.setRowCount(0)
             self.sureRangeSlider.setRange(0, 100)
             # self.labelTable.setRowCount(len(res[0].names))
@@ -401,8 +407,7 @@ class Window(TopFluentWindow):
                 self.labelTable.setItem(i, 0, nameItem)
                 self.labelTable.setItem(i, 1, numItem)
             if len(items) > 0:
-                self.labelTable.setCurrentCell(0, 0)
-                self.currentLabelChanged(0, 0)
+                self.currentLabelChanged(-1, -1)
 
         t = ProgressToast("正在推理⏳:", "请耐心等待！", parent=self)
 
@@ -416,59 +421,75 @@ class Window(TopFluentWindow):
         t.show()
 
     def preAllButtonClicked(self):
-        pass
-        # pt = ProgressToast("正在推理⏳:", "请耐心等待！", parent=self)
-        # pt.show()
-        # pt.setProgress(50)
-        # total_time = 0
-        # if self.model_path == "" or self.data_path == "":
-        #     create_toast("注意⚠️：", "请确认是否选择模型以及数据集文件夹", parent=self)
-        #     return
-        # model = YOLO(self.model_path)
-        # res = model.predict(
-        #     self.files_path,
-        #     device=self.deviceChoose.currentText(),
-        #     conf=float(self.sureSlider.value()) / 100,
-        #     name="custom",
-        #     project="outputs",
-        #     save=True,
-        #     **self.yolo_args,
-        # )
-        # for r in res:
-        #     total_time += (
-        #         r.speed["preprocess"] + r.speed["inference"] + r.speed["postprocess"]
-        #     )
-        # create_toast(
-        #     "推理成功✅",
-        #     f"已保存至outputs文件夹内\n总用时:{total_time:.1f}ms,平均用时:{total_time/len(res):.1f}",
-        #     parent=self,
-        #     duration=2500,
-        # )
+        def finish(total_time):
+            create_toast(
+                "推理成功✅",
+                f"已保存至 runs/detect/preAll/custom 文件夹内\n总用时:{total_time:.1f}ms, 平均用时:{total_time/len(self.files_path):.1f}ms",
+                parent=self,
+                duration=2500,
+            )
+
+        if self.model_path == "" or self.data_path == "":
+            create_toast("注意⚠️：", "请确认是否选择模型以及数据集文件夹", parent=self)
+            return
+        p = ProgressToast("正在推理⏳:", "请耐心等待！", parent=self)
+
+        args = self.yolo_args
+        args["device"] = self.deviceChoose.currentText()
+        args["conf"] = float(self.sureSlider.value()) / 100
+        args["name"] = "custom"
+        args["project"] = "preAll"
+        args["exist_ok"] = True
+        args["save"] = True
+        self.pt = PreThread(self.files_path, self.model_path, args)
+        self.pt.timeResult.connect(finish)
+        self.pt.progress.connect(p.setProgress)
+        self.pt.start()
+
+        p.show()
 
     def currentLabelChanged(self, row, col):
+        def fill(data:list[Boxes]):
+            self.resTable.clearContents()
+            self.resTable.setRowCount(len(data))
+            for i, box in enumerate(data):
+                nameItem = QTableWidgetItem(self.names[int(box.cls[0])])
+                confItem = QTableWidgetItem(str(int(float(box.conf[0]) * 100) / 100))
+
+                self.resTable.setItem(i, 0, nameItem)
+                self.resTable.setItem(i, 1, confItem)  # 截断小数点俩位之后的数
         item = self.labelTable.item(row, 0)
-        if hasattr(item, "text"):
+        # 筛选所有符合范围的box
+        sure_boxs = {}
+        max = self.sureRangeSlider.maxValue() / 100
+        min = self.sureRangeSlider.minValue() / 100
+        for label,boxs in self.cls.items():
+            for box in boxs:
+                conf = float(box.conf[0])
+                if min <= conf <= max:
+                    tmp:list = sure_boxs.get(label,[])
+                    tmp.append(box)
+                    sure_boxs[label] = tmp
+
+        if hasattr(item, "text"): #说明选择了label
             label = item.text()
             boxs: list[Boxes] = self.cls[label]
 
             self.now_name = label
-            self.now_boxs = []
-            # 筛选在置信区间的box，然后再设置row数量并填充
-            for i, box in enumerate(boxs):
-                conf = float(box.conf[0])
-                max = self.sureRangeSlider.maxValue() / 100
-                min = self.sureRangeSlider.minValue() / 100
-                if min <= conf <= max:
-                    self.now_boxs.append(box)
-
+            self.now_boxs = sure_boxs.get(label,[])
+        elif self.labelTable.rowCount() == 0:
+            self.now_boxs.clear()
             self.resTable.clearContents()
-            self.resTable.setRowCount(len(self.now_boxs))
-            for i, box in enumerate(self.now_boxs):
-                idItem = QTableWidgetItem(str(i + 1))
-                confItem = QTableWidgetItem(str(int(float(box.conf[0]) * 100) / 100))
-
-                self.resTable.setItem(i, 0, idItem)
-                self.resTable.setItem(i, 1, confItem)  # 截断小数点俩位之后的数
+            self.resTable.setRowCount(0)
+        else: # 有label但是没有选中
+            self.now_boxs.clear()
+            for boxs in sure_boxs.values():
+                self.now_boxs.extend(boxs)
+        fill(self.now_boxs) #填充数据
+        if self.now_res:
+            img_bgr = drawCustomRes(self.now_res).plot(custom_boxs=self.now_boxs)
+            img_rgb = Image.fromarray(img_bgr[..., ::-1])  # bgr->rgb
+            self.imageDis2.setImage(img_rgb.toqimage())
 
     def sureRangeChanged(self, min, max):
         tmp_cls = {}
@@ -497,18 +518,30 @@ class Window(TopFluentWindow):
                 iseq = True
                 self.labelTable.setCurrentCell(i, 0)
                 self.currentLabelChanged(i, 0)  # 手动触发
-        if not iseq and len(tmp_cls) > 0:  # 设置默认第一个
-            self.labelTable.setCurrentCell(0, 0)
-            self.currentLabelChanged(0, 0)
+                return
+        if not iseq and len(tmp_cls) > 0:  
+            self.labelTable.setCurrentCell(-1, -1)
+        self.currentLabelChanged(-1, -1)
         # print(f"当前选中的label:{currentLabelId},name:{currentLabelName}")
 
     def currentResChanged(self, row, col):
-        print(f"第{row}个box")
-
-
+        if self.resTable.currentRow() >= 0:
+            img_bgr = drawCustomRes(self.now_res).plot(custom_boxs=[self.now_boxs[row]])
+            img_rgb = Image.fromarray(img_bgr[..., ::-1])  # bgr->rgb
+            self.imageDis2.setImage(img_rgb.toqimage())
+        else:
+            self.currentLabelChanged(self.labelTable.currentRow(),self.labelTable.currentColumn())
+    def labelDoubleClicked(self,row,col):
+        self.labelTable.setCurrentCell(-1,-1)
+        self.resTable.setCurrentCell(-1,-1)
+        self.currentLabelChanged(-1,-1)
+    def resDoubleClicked(self,row,col):
+        self.resTable.setCurrentCell(-1,-1)
+        self.currentLabelChanged(-1,-1)
 class PreThread(QThread):
     progress = Signal(int)
     resultReady = Signal(object)
+    timeResult = Signal(float)
 
     def __init__(
         self,
@@ -522,6 +555,7 @@ class PreThread(QThread):
         self.args = args
         self.model_path = model_path
         self.needRes = needRes
+        self.totalTime = 0
         self.model = YOLO(self.model_path)
 
     def run(self):
@@ -533,12 +567,17 @@ class PreThread(QThread):
                     img,
                     **self.args,
                 )
+                self.totalTime += (
+                    r[0].speed["preprocess"]
+                    + r[0].speed["inference"]
+                    + r[0].speed["postprocess"]
+                )
                 if not self.needRes:
                     del r
                     torch.cuda.empty_cache()
                 else:
                     res.append(r[0])
-                self.progress.emit(int(len(self.imgs) / (i + 1)))
+                self.progress.emit(int((i + 1) / len(self.imgs) * 100))
         else:
             self.progress.emit(25)
             r = self.model.predict(
@@ -546,11 +585,17 @@ class PreThread(QThread):
                 **self.args,
             )
             self.progress.emit(80)
+            self.totalTime += (
+                r[0].speed["preprocess"]
+                + r[0].speed["inference"]
+                + r[0].speed["postprocess"]
+            )
             if not self.needRes:
                 del r
                 torch.cuda.empty_cache()
             else:
                 res.append(r[0])
             self.progress.emit(100)
+        self.timeResult.emit(self.totalTime)
         if self.needRes:
             self.resultReady.emit(res)
