@@ -1,4 +1,4 @@
-import torch
+import torch,sys
 import numpy as np
 from pathlib import Path
 from copy import deepcopy
@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QStyleOptionViewItem,
     QAbstractItemView,
-    QStyledItemDelegate,
     QVBoxLayout,
 )
 from PySide6.QtGui import QImage, QImageReader, QMovie, QPixmap
@@ -130,7 +129,12 @@ def add_style_sheet(widget: QWidget, styleSheet: str):
     qss = widget.styleSheet() + "\n" + styleSheet
     widget.setStyleSheet(qss)
 
-
+def get_resource_path(relative_path: str) -> str:
+    if getattr(sys, 'frozen', False):
+        base = Path(sys.executable).parent
+    else:
+        base = Path.cwd()
+    return str(base / relative_path)
 class MyTableItemDelegate(TableItemDelegate):
     def __init__(self, parent):
         super().__init__(parent)

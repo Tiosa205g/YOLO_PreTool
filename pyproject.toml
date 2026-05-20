@@ -1,0 +1,26 @@
+[project]
+name = "yolo_pre_tool"
+version = "0.1.0"
+description = "yolo目标检测预测工具"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "colorthief>=0.2.1",
+    "darkdetect>=0.8.0",
+    "nuitka>=4.1.1",
+    "opencv-python",
+    "pyside6>=6.11.1",
+    "pywin32>=311",
+    "torch",
+    "torchvision",
+    "ultralytics>=8.4.51",
+]
+
+[tool.uv.sources]
+torch = { path = "torch-2.6.0+cu124-cp312-cp312-win_amd64.whl" }
+opencv-python = { path = "opencv_python-4.10.0.84-cp37-abi3-win_amd64.whl" }
+torchvision = { path = "torchvision-0.21.0+cu124-cp312-cp312-win_amd64.whl" }
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true

@@ -1,9 +1,8 @@
 import torch, os, math
 from ultralytics import YOLO
-from ultralytics.engine.results import Boxes, Results
+from ultralytics.engine.results import Boxes
 from pathlib import Path
 from .util import *
-from functools import partial
 from matplotlib import pyplot as plt
 from PIL import Image
 from PySide6.QtWidgets import (
@@ -97,7 +96,7 @@ class Window(TopFluentWindow):
         self.titleBar.setDoubleClickEnabled(False)  # 去除双击放大
 
         self.background = AcrylicLabel(20, QColor(105, 114, 168, 102), parent=self)
-        self.background.setImage("ui/img/background.jpg")
+        self.background.setImage(get_resource_path("img/background.png"))
         self.background.blurThread.blurFinished.connect(self.onBackgroundLoaded)
         self.background.lower()  # 最下层
 
@@ -333,7 +332,7 @@ class Window(TopFluentWindow):
     def widgetChanged(self, index):
 
         widget = self.stackedWidget.widget(index)
-        print(f"widgetChanged:{self.data_path}")
+        # print(f"widgetChanged:{self.data_path}")
         if (
             widget.objectName() == "preWidget"
             and len(self.data_path) != 0
