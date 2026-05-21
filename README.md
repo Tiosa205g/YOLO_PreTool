@@ -3,9 +3,14 @@
 这个仓库分成两部分：
 
 1. 训练部分：用于在启智社区 / OpenI 的线上训练环境里训练 YOLO 模型，脚本会自动通过 C2Net 上下文获取数据集和预训练权重，并在训练结束后回传结果。
-2. 推理部分：用于本地加载 `.pt` 权重做图像推理，包含命令行验证脚本和一个基于 PySide6 + QFluentWidgets Pro 的图形界面工具。
+2. 推理部分：用于本地加载 `.pt` 权重做图像推理，包含命令行验证脚本和一个基于 PySide6 + **[PySide6-Fluent-Widgets-Pro](https://github.com/Fairy-Oracle-Sanctuary/PySide6-Fluent-Widgets-Pro)** 的图形界面工具。
 
 当前项目仍然以 PyTorch / Ultralytics 的 `.pt` 流程为主，暂不考虑转换为 ONNX，也不计划重写整套推理过程。
+
+## 界面
+
+![1](display/1.png)
+![2](display/2.png)
 
 ## 项目内容
 
@@ -67,7 +72,7 @@ uv sync
 ### 1. 本地推理工具
 
 ```bash
-python main.py
+uv run main.py
 ```
 
 启动后会打开图形界面，选择模型文件和数据目录即可开始推理。
@@ -75,13 +80,13 @@ python main.py
 ### 2. 本地验证
 
 ```bash
-python val.py
+uv run val.py
 ```
 
 ### 3. 本地推理示例
 
 ```bash
-python pre.py
+uv run pre.py
 ```
 
 默认会加载当前目录下的 `best.pt`，并对示例图片执行推理。

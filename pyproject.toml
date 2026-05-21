@@ -7,7 +7,6 @@ requires-python = ">=3.12"
 dependencies = [
     "colorthief>=0.2.1",
     "darkdetect>=0.8.0",
-    "nuitka>=4.1.1",
     "opencv-python",
     "pyside6>=6.11.1",
     "pywin32>=311",
