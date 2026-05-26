@@ -26,6 +26,7 @@ from ultralytics import YOLO
 parser = argparse.ArgumentParser()
 parser.add_argument('--model',type=str,default='yolo26m/yolo26m.pt')
 parser.add_argument('--data',type=str,default='brain-tumor')
+parser.add_argument('--count',type=int,default=100)
 args = parser.parse_args()
 print(args)
 #初始化导入数据集和预训练模型到容器内
@@ -50,11 +51,10 @@ if __name__ == '__main__':
     # Load a model
     model = YOLO(model_path)  
     results = model.train(data="data.yaml",
-                          epochs=100,
+                          epochs=args.count,
                           imgsz=640,
                           device=device,
                           resume = RESUME,
-                          flipud = 0.4 #上下颠倒概率
                           )
     import shutil
     try:
