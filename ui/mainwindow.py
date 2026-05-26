@@ -223,20 +223,20 @@ class Window(TopFluentWindow):
         )
         self.sureSlider.setRange(0, 100)
         self.sureSlider.setValue(25)
-        preButton = RoundPushButton(card1)
-        preButton.setFixedHeight(50)
-        preButton.setCursor(Qt.CursorShape.PointingHandCursor)
-        preButton.setText("推理")
-        preButton.clicked.connect(self.preButtonClicked)
-        preAllButton = RoundPushButton(card1)
-        preAllButton.setFixedHeight(50)
-        preAllButton.setCursor(Qt.CursorShape.PointingHandCursor)
-        preAllButton.setText("全部推理并输出")
-        preAllButton.clicked.connect(self.preAllButtonClicked)
+        self.preButton = RoundPushButton(card1)
+        self.preButton.setFixedHeight(50)
+        self.preButton.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.preButton.setText("推理")
+        self.preButton.clicked.connect(self.preButtonClicked)
+        self.preAllButton = RoundPushButton(card1)
+        self.preAllButton.setFixedHeight(50)
+        self.preAllButton.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.preAllButton.setText("全部推理并输出")
+        self.preAllButton.clicked.connect(self.preAllButtonClicked)
         vLayout.addWidget(sureLabel)
         vLayout.addWidget(self.sureSlider)
-        vLayout.addWidget(preButton)
-        vLayout.addWidget(preAllButton)
+        vLayout.addWidget(self.preButton)
+        vLayout.addWidget(self.preAllButton)
         vLayout.addStretch()
 
         card2 = SimpleCardWidget(w)
@@ -407,12 +407,16 @@ class Window(TopFluentWindow):
                 self.labelTable.setItem(i, 1, numItem)
             if len(items) > 0:
                 self.currentLabelChanged(-1, -1)
+            for w in (self.preAllButton, self.preButton, self.imageChoose, self.deviceChoose, self.sureSlider):
+                w.setEnabled(True)
 
         t = ProgressToast("正在推理⏳:", "请耐心等待！", parent=self)
 
         args: dict = self.yolo_args
         args["device"] = self.deviceChoose.currentText()
         args["conf"] = float(self.sureSlider.value()) / 100
+        for w in (self.preAllButton, self.preButton, self.imageChoose, self.deviceChoose, self.sureSlider):
+            w.setEnabled(False)
         self.pt = PreThread(self.imageChoose.currentData(), self.model_path, args, True)
         self.pt.resultReady.connect(finish)
         self.pt.progress.connect(t.setProgress)
@@ -427,6 +431,8 @@ class Window(TopFluentWindow):
                 parent=self,
                 duration=2500,
             )
+            for w in (self.preAllButton, self.preButton, self.imageChoose, self.deviceChoose, self.sureSlider):
+                w.setEnabled(True)
 
         if self.model_path == "" or self.data_path == "":
             create_toast("注意⚠️：", "请确认是否选择模型以及数据集文件夹", parent=self)
@@ -440,6 +446,8 @@ class Window(TopFluentWindow):
         args["project"] = "preAll"
         args["exist_ok"] = True
         args["save"] = True
+        for w in (self.preAllButton, self.preButton, self.imageChoose, self.deviceChoose, self.sureSlider):
+            w.setEnabled(False)
         self.pt = PreThread(self.files_path, self.model_path, args)
         self.pt.timeResult.connect(finish)
         self.pt.progress.connect(p.setProgress)
@@ -546,7 +554,7 @@ class PreThread(QThread):
         self,
         imgs: str | Path | int | Image.Image | list | tuple,
         model_path: str,
-        args: dict = {"conf": 0.3},
+        args: dict = {"conf": 0.25},
         needRes=False,
     ):
         super().__init__()
