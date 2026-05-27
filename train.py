@@ -26,6 +26,7 @@ from ultralytics import YOLO
 parser = argparse.ArgumentParser()
 parser.add_argument('--model',type=str,default='yolo26m/yolo26m.pt')
 parser.add_argument('--data',type=str,default='brain-tumor')
+parser.add_argument('--data_argument',type=str,default='data.yaml')
 parser.add_argument('--count',type=int,default=100)
 args = parser.parse_args()
 print(args)
@@ -50,7 +51,7 @@ if __name__ == '__main__':
     print(brain_tumor_path,model_path)
     # Load a model
     model = YOLO(model_path)  
-    results = model.train(data="data.yaml",
+    results = model.train(data=args.data_argument,
                           epochs=args.count,
                           imgsz=640,
                           device=device,
