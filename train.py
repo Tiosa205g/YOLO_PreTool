@@ -50,7 +50,7 @@ brain_tumor_path = c2net_context.dataset_path + "/" + args.data
 # 获取预训练模型路径
 model_path = c2net_context.pretrain_model_path + "/" + args.model
 file_path = (
-    Path(c2net_context.pretrain_model_path) / Path(args.data_argument)
+    Path(c2net_context.dataset_path) / Path(args.data_argument)
     if args.data_argument != "data.yaml"
     else Path("data.yaml")
 )
